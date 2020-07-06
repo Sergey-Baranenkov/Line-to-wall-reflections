@@ -43,12 +43,13 @@ const bottom = new border(new pt(0,0), new pt (width, 0));
 const right = new border(new pt(width,0), new pt (width, height));
 const square = [left,up,bottom,right];
 
-const rhombnorthwest = new border(new pt(0,300), new pt(300,600));
-const rhombnortheast = new border(new pt(300,600), new pt(600,300));
-const rhombsoutheast = new border(new pt(600,300), new pt(300,0));
-const rhombsouthwest = new border(new pt(300,0), new pt(0,300));
+const rhombnorthwest = new border(new pt(0,height/2), new pt(width/2,height));
+const rhombnortheast = new border(new pt(width/2,height), new pt(width,height/2));
+const rhombsoutheast = new border(new pt(width,height/2), new pt(width / 2,0));
+const rhombsouthwest = new border(new pt(width/2,0), new pt(0,height/2));
+const rhombInside = new border(new pt(width/2,height/6), new pt(width / 10,height/ 1.8));
 
-const rhomb = [rhombnorthwest,rhombnortheast,rhombsoutheast,rhombsouthwest];
+const rhomb = [rhombInside,rhombnorthwest,rhombnortheast,rhombsoutheast,rhombsouthwest];
 
 const drawFigure = (ctx, borders)=>{
     borders.forEach(bord =>{

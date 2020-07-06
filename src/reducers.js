@@ -17,14 +17,6 @@ const move = (x, y, v, angle) => {
 
 const pipe2 = (f, g) => (...args) => g(f(...args));
 const pipeline = (...func) => reduce(func)(pipe2);
-
-const mul = (x,y) => x * y;
-const div = (x,y) => x / y;
-const opAll = op => (cf, ...args) => args.map( v => op(v, cf));
-const normalize = cf => (...args) => opAll(div)(cf, ...args);
-const denormalize = cf => (...args) => opAll(mul)(cf, ...args);
-
-
 const euclideanDistance = (a, b) => (a ** 2 + b ** 2) ** 0.5
 
 class line{
@@ -101,14 +93,22 @@ const hade = (v1, v2) => Math.atan2(v1.x * v2.y - v2.x * v1.y, v1.x * v2.x + v1.
 const zeroVec = new pt(1,0);
 const projPipeline = pipeline(hade, toDegrees);
 
-const v = 50;
+const v = 100;
 export const reducer = (state, action) => {
     switch (action.type) {
         case "MOVE":
             const [newx, newy] = move(state.x, state.y, v, state.angle);
             const info = action.borders
                 .map(border => ({inters: intersect(new pt(state.x, state.y), new pt(newx, newy), ...border.getPoints()),  border: border }))
-                .filter(info => info.inters.intersect && !(info.inters.left.equal(info.inters.right) && info.inters.left.equal(new pt(state.x, state.y))))[0];
+                .filter(info => info.inters.intersect && !(info.inters.left.equal(info.inters.right) && info.inters.left.equal(new pt(state.x, state.y))))
+                .reduce((prev, next) =>
+                    (   !prev ||
+                        euclideanDistance(next.inters.left.x - state.x, next.inters.left.y - state.y)
+                        <
+                        euclideanDistance(prev.inters.left.x - state.x, prev.inters.left.y - state.y)
+                    ) ? next : prev, null
+                )
+
             if (!info){
                 return {x: newx, y: newy, angle: state.angle};
             }else{
