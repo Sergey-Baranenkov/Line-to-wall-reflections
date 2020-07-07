@@ -2,7 +2,6 @@ import pt from "./point";
 import {EPS} from "./point";
 
 const demethodize = method => ctx => (...args) => method.apply(ctx, args);
-
 const toRadians = angle => angle * (Math.PI / 180);
 const toDegrees = angle => angle * (180 / Math.PI);
 const sin = demethodize(Math.sin)(Math);
@@ -40,8 +39,11 @@ class line{
 
 const det = (a,b,c,d) => a*d-b*c;
 
+const min = demethodize(Math.min)(Math);
+const max = demethodize(Math.max)(Math);
+
 const betw = (l, r, x) => {
-    return (Math.min(l,r) <= (x + EPS)) && (x <= (Math.max(l,r) + EPS));
+    return (min(l,r) <= (x + EPS)) && (x <= (max(l,r) + EPS));
 }
 
 const swap = (a,b) => [b,a];
@@ -49,10 +51,12 @@ const swap = (a,b) => [b,a];
 const intersect_1d = ( a,  b,  c,  d) => {
     if (a > b)  [a,b] = swap (a, b);
     if (c > d)  [c,d] = swap (c, d);
-    return Math.max (a, c) <= (Math.min (b, d) + EPS);
+    return max(a, c) <= min (b, d) + EPS;
 }
 
 const intersectInfo = (bool, left, right) => ({intersect: bool, left, right})
+
+const abs = demethodize(Math.abs)(Math);
 
 const intersect = (a, b, c, d) => {
     let left = new pt(undefined,undefined);
@@ -64,17 +68,15 @@ const intersect = (a, b, c, d) => {
     const n = new line(c, d);
     const zn = det (m.a, m.b, n.a, n.b);
 
-    if (Math.abs (zn) < EPS) {
-        if (Math.abs (m.dist (c)) > EPS || Math.abs (n.dist (a)) > EPS)
+    if (abs (zn) < EPS) {
+        if (abs (m.dist (c)) > EPS || abs (n.dist (a)) > EPS)
             return intersectInfo(false, left,right);
-
         if (b.less(a))  swap (a, b);
         if (d.less(c))  swap (c, d);
         left = a.less(c) ? c : a;
         right = b.less(d)? b : d;
         return intersectInfo(true, left,right);
-    }
-    else {
+    } else {
         left.x = right.x = - det (m.c, m.b, n.c, n.b) / zn;
         left.y = right.y = - det (m.a, m.c, n.a, n.c) / zn;
         return intersectInfo(
@@ -97,26 +99,29 @@ const v = 100;
 export const reducer = (state, action) => {
     switch (action.type) {
         case "MOVE":
-            const [newx, newy] = move(state.x, state.y, v, state.angle);
-            const info = action.borders
-                .map(border => ({inters: intersect(new pt(state.x, state.y), new pt(newx, newy), ...border.getPoints()),  border: border }))
-                .filter(info => info.inters.intersect && !(info.inters.left.equal(info.inters.right) && info.inters.left.equal(new pt(state.x, state.y))))
-                .reduce((prev, next) =>
-                    (   !prev ||
-                        euclideanDistance(next.inters.left.x - state.x, next.inters.left.y - state.y)
-                        <
-                        euclideanDistance(prev.inters.left.x - state.x, prev.inters.left.y - state.y)
-                    ) ? next : prev, null
-                )
-
-            if (!info){
-                return {x: newx, y: newy, angle: state.angle};
-            }else{
-                const projection = projPipeline(zeroVec, vectorize(info.border.a.x, info.border.a.y, info.border.b.x, info.border.b.y));
-                const x = projPipeline(vectorize(state.x, state.y, newx, newy), vectorize(info.border.a.x, info.border.a.y, info.border.b.x, info.border.b.y));
-                const angle = projection + x;
-                return {x: info.inters.left.x, y: info.inters.left.y, angle: angle};
-            }
+            return state.map((coords)=>{
+                const [newX, newY] = move(coords.x, coords.y, v, coords.angle);
+                const info = action.borders
+                    .map(border => ({inters: intersect(new pt(coords.x, coords.y), new pt(newX, newY), ...border.getPoints()),  border: border }))
+                    .filter(info => info.inters.intersect && !(info.inters.left.equal(info.inters.right) && info.inters.left.equal(new pt(coords.x, coords.y))))
+                    .reduce((prev, next) =>
+                        (   !prev ||
+                            euclideanDistance(next.inters.left.x - coords.x, next.inters.left.y - coords.y)
+                            <
+                            euclideanDistance(prev.inters.left.x - coords.x, prev.inters.left.y - coords.y)
+                        ) ? next : prev, null
+                    )
+                if (!info){
+                    return {x: newX, y: newY, angle: coords.angle};
+                }else{
+                    const v = vectorize(info.border.a.x, info.border.a.y, info.border.b.x, info.border.b.y);
+                    const zeroProj = projPipeline(zeroVec, v);
+                    const vecProj = projPipeline(vectorize(coords.x, coords.y, newX, newY), v);
+                    return {x: info.inters.left.x, y: info.inters.left.y, angle: zeroProj + vecProj};
+                }
+            })
+        case "ADD":
+            return [...state, {x: action.x, y: action.y, angle: action.angle}];
         default:
             return state;
     }

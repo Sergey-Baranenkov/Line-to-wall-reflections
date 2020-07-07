@@ -4,6 +4,8 @@ import border from "./border";
 import pt from "./point";
 
 const makeMove = (borders) => () => ({type: "MOVE", borders});
+const spawnLine = (x, y, angle) => ({type: "ADD", x, y, angle});
+
 const curry = (fn, len = fn.length) => !len ? fn(): x => curry(fn.bind(null, x));
 
 const getColor = numberOfSteps => {
@@ -65,7 +67,7 @@ const drawFigure = (ctx, borders)=>{
 function App({figure = rhomb}) {
     const r = useRef(null);
     const ctx = useRef(undefined);
-    const prev = useRef({x: 300, y:300});
+    const prev = useRef([{x: 300, y:300}]);
     const getMyColor = useCallback(getColor(10),[]);
     const makeMyMove = useCallback(makeMove(figure),[]);
     const coords = useSelector(s => s);
@@ -81,18 +83,26 @@ function App({figure = rhomb}) {
         ctx.current.translate(0, height);
         ctx.current.scale(1, -1);
         drawFigure(ctx,figure);
-        const interval = setInterval(tick, 100);
+        const interval = setInterval(tick, 500);
         return () => clearInterval(interval);
     },[]);
 
+    const spawnMyLine = useCallback(()=>{
+        const dot = {x: 300, y: 300, angle: 360 * Math.random()};
+        prev.current.push(dot)
+        dispatch(spawnLine(dot.x, dot.y, dot.angle));
+    })
 
     useEffect(()=>{
-        ctx.current.beginPath();
-        ctx.current.moveTo(prev.current.x,prev.current.y);
         ctx.current.strokeStyle = getMyColor();
-        ctx.current.lineTo(coords.x, coords.y);
-        prev.current = {x: coords.x, y:coords.y};
-        ctx.current.stroke();
+        coords.forEach((c,i) => {
+            ctx.current.beginPath();
+            ctx.current.moveTo(prev.current[i].x, prev.current[i].y);
+            ctx.current.lineTo(c.x, c.y);
+            prev.current[i] = {x: c.x, y: c.y};
+            ctx.current.stroke();
+        })
+
     }, [coords]);
 
     return (
@@ -105,6 +115,7 @@ function App({figure = rhomb}) {
               Canvas is not supported by your browser
           </canvas>
           <button onClick={tick}>tick</button>
+          <button onClick={spawnMyLine}>Spawn line</button>
       </>
     )
 }
