@@ -6,8 +6,7 @@ import {Provider} from "react-redux"
 import {createStore} from "redux";
 import {reducer} from "./reducers";
 
-const initialState = [{x:300, y: 300, angle: 30}];
-
+const initialState = [];
 const store = createStore(reducer, initialState);
 
 ReactDOM.render(

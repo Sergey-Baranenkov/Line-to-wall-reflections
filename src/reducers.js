@@ -1,5 +1,5 @@
-import pt from "./point";
-import {EPS} from "./point";
+import pt, {EPS} from "./point";
+import ray from "./ray";
 
 const demethodize = method => ctx => (...args) => method.apply(ctx, args);
 const toRadians = angle => angle * (Math.PI / 180);
@@ -95,33 +95,72 @@ const hade = (v1, v2) => Math.atan2(v1.x * v2.y - v2.x * v1.y, v1.x * v2.x + v1.
 const zeroVec = new pt(1,0);
 const projPipeline = pipeline(hade, toDegrees);
 
-const v = 100;
+const deepClone = (obj, hash = new WeakMap()) => {
+    if (Object(obj) !== obj) return obj; // primitives
+    if (hash.has(obj)) return hash.get(obj); // cyclic reference
+    const result = obj instanceof Set ? new Set(obj)
+        : obj instanceof Map ? new Map(Array.from(obj, ([key, val]) =>
+                [key, deepClone(val, hash)]))
+            : obj instanceof Date ? new Date(obj)
+                : obj instanceof RegExp ? new RegExp(obj.source, obj.flags)
+                    : typeof obj === "function" ? obj
+                        : obj.constructor ? new obj.constructor()
+                            : Object.create(null);
+
+    hash.set(obj, result);
+    return Object.assign(result, ...Object.keys(obj).map(
+        key => ({ [key]: deepClone(obj[key], hash) }) ));
+
+}
+
+
+const v = 75;
+
+const mapReducer = (array, fn) => array.reduce((prev, next, ...args) => {
+    return prev.concat(fn(next, ...args) || []);
+}, [])
+
 export const reducer = (state, action) => {
     switch (action.type) {
         case "MOVE":
-            return state.map((coords)=>{
-                const [newX, newY] = move(coords.x, coords.y, v, coords.angle);
-                const info = action.borders
-                    .map(border => ({inters: intersect(new pt(coords.x, coords.y), new pt(newX, newY), ...border.getPoints()),  border: border }))
-                    .filter(info => info.inters.intersect && !(info.inters.left.equal(info.inters.right) && info.inters.left.equal(new pt(coords.x, coords.y))))
+            return mapReducer( state,ray => {
+                if ( ray.lifetime < 1 ) return null;
+                ray = deepClone(ray);
+                const [newX, newY] = move(ray.vec.b.x, ray.vec.b.y, v, ray.angle);
+                const info =
+                    action.borders
+                    .map(border => ({
+                        inters: intersect(new pt(ray.vec.b.x, ray.vec.b.y), new pt(newX, newY), ...border.getPoints()),
+                        border: border
+                    }))
+                    .filter(info =>
+                        info.inters.intersect &&
+                        !(
+                            info.inters.left.equal(info.inters.right) &&
+                            info.inters.left.equal(new pt(ray.vec.b.x, ray.vec.b.y))
+                        )
+                    )
                     .reduce((prev, next) =>
                         (   !prev ||
-                            euclideanDistance(next.inters.left.x - coords.x, next.inters.left.y - coords.y)
+                            euclideanDistance(next.inters.left.x - ray.vec.b.x, next.inters.left.y - ray.vec.b.y)
                             <
-                            euclideanDistance(prev.inters.left.x - coords.x, prev.inters.left.y - coords.y)
+                            euclideanDistance(prev.inters.left.x - ray.vec.b.x, prev.inters.left.y - ray.vec.b.y)
                         ) ? next : prev, null
                     )
+
                 if (!info){
-                    return {x: newX, y: newY, angle: coords.angle};
+                    return ray.continue(new pt(newX, newY), ray.angle);
                 }else{
                     const v = vectorize(info.border.a.x, info.border.a.y, info.border.b.x, info.border.b.y);
                     const zeroProj = projPipeline(zeroVec, v);
-                    const vecProj = projPipeline(vectorize(coords.x, coords.y, newX, newY), v);
-                    return {x: info.inters.left.x, y: info.inters.left.y, angle: zeroProj + vecProj};
+                    const vecProj = projPipeline(vectorize(ray.vec.b.x, ray.vec.b.y, newX, newY), v);
+                    return ray.continue(new pt(info.inters.left.x, info.inters.left.y), zeroProj + vecProj).hit();
                 }
             })
+
         case "ADD":
-            return [...state, {x: action.x, y: action.y, angle: action.angle}];
+            const p = new pt(action.x, action.y);
+            return [...state, new ray(p, p, action.angle, action.lifetime)];
         default:
             return state;
     }
